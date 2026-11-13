@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hem – Gabriels TV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Skriven för Tizen 4 (2018), som har en gammal webbmotor (Chromium 56):
+     ingen CSS grid, ingen "gap", ingen backdrop-filter. Bara flexbox + marginaler. */
+  :root {
+    --text: #f4f6fb;
+    --muted: rgba(244, 246, 251, 0.62);
+    --tile: rgba(10, 12, 22, 0.66);
+    --tile-focus: rgba(255, 255, 255, 0.18);
+    --radius: 30px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #05070d;
+    font-family: "Inter", "Samsung One", "Helvetica Neue", Arial, sans-serif;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 1920px; height: 1080px;
+    margin-left: -960px; margin-top: -540px;
+    overflow: hidden;
+    background: #070a14;
+  }
+
+  /* ---- Bakgrund: egen bild om den finns, annars mjuka färgfläckar ---- */
+  #bg-image {
+    position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+    background-size: cover; background-position: center;
+    display: none;
+  }
+  #bg-shade {
+    position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+    /* Mörkare upptill och nertill så texten syns oavsett bild */
+    background: linear-gradient(180deg, rgba(4,6,12,0.7) 0%, rgba(4,6,12,0.35) 45%, rgba(4,6,12,0.8) 100%);
+    display: none;
+  }
+  .has-image #bg-image, .has-image #bg-shade { display: block; }
+  .has-image .glow { display: none; }
+
+  .glow {
+    position: absolute; border-radius: 50%;
+    opacity: 0.55;
+    -webkit-filter: blur(120px); filter: blur(120px);
+    -webkit-animation: drift 38s ease-in-out infinite alternate;
+    animation: drift 38s ease-in-out infinite alternate;
+  }
+  .g1 { width: 900px; height: 900px; left: -200px; top: -300px; background: #1d3f7a; }
+  .g2 { width: 800px; height: 800px; right: -250px; top: 120px; background: #3b2a6e;
+        -webkit-animation-duration: 46s; animation-duration: 46s; }
+  .g3 { width: 1000px; height: 600px; left: 500px; bottom: -380px; background: #0f5560;
+        -webkit-animation-duration: 52s; animation-duration: 52s; }
+  @-webkit-keyframes drift { from { -webkit-transform: translate(0,0); } to { -webkit-transform: translate(120px,60px); } }
+  @keyframes drift { from { transform: translate(0,0); } to { transform: translate(120px,60px); } }
+
+  .content { position: relative; z-index: 1; height: 100%; padding: 80px 120px 0; }
+
+  /* ---- Klocka ---- */
+  header { display: flex; justify-content: space-between; align-items: flex-start; }
+  #time { font-size: 150px; font-weight: 200; letter-spacing: -4px; line-height: 1; text-shadow: 0 4px 30px rgba(0,0,0,0.35); }
+  #date { margin-top: 14px; font-size: 32px; font-weight: 300; color: var(--muted); }
+  #date::first-letter { text-transform: uppercase; }
+
+  /* ---- Väder ---- */
+  #weather { text-align: right; padding-top: 10px; }
+  .now { display: flex; align-items: center; justify-content: flex-end; }
+  .now svg { width: 96px; height: 96px; margin-right: 22px; }
+  #temp { font-size: 96px; font-weight: 200; line-height: 1; letter-spacing: -2px; }
+  #wdesc { margin-top: 10px; font-size: 26px; font-weight: 300; color: var(--muted); }
+  #forecast { display: flex; justify-content: flex-end; margin-top: 26px; }
+  .day {
+    width: 116px; margin-left: 14px; padding: 14px 0 12px;
+    border-radius: 22px; background: rgba(10, 12, 22, 0.62);
+    border: 1px solid rgba(255,255,255,0.07);
+    text-align: center;
+  }
+  .day .dn { font-size: 18px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+  .day svg { width: 40px; height: 40px; margin: 8px 0 4px; }
+  .day .dt { font-size: 20px; }
+  .day .dt span { color: var(--muted); }
+  #wnote { margin-top: 10px; font-size: 15px; color: rgba(244,246,251,0.35); }
+
+  /* ---- Kul grej under hälsningen ---- */
+  #fun {
+    margin-top: 26px; max-width: 1050px;
+    display: flex; align-items: flex-start;
+    padding: 18px 26px; border-radius: 22px;
+    background: rgba(10, 12, 22, 0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    -webkit-transition: opacity 0.8s ease; transition: opacity 0.8s ease;
+  }
+  #fun.hide { opacity: 0; }
+  #fun-emoji { width: 34px; height: 34px; margin: 2px 18px 0 0; flex-shrink: 0; }
+  #fun-emoji svg { width: 34px; height: 34px; }
+  #fun-label { font-size: 16px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: #8fd3ff; margin-bottom: 6px; }
+  #fun-text { font-size: 24px; font-weight: 300; line-height: 1.35; }
+
+  /* ---- Rubriker ---- */
+  .label {
+    font-size: 22px; font-weight: 500; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 22px 8px;
+  }
+  #apps-section { margin-top: 36px; }
+  #inputs-section { margin-top: 30px; }
+
+  .row { display: flex; flex-wrap: nowrap; margin-bottom: 26px; }
+
+  /* ---- Rutor ---- */
+  .tile {
+    position: relative;
+    width: 254px; height: 132px;
+    margin-right: 26px;
+    border-radius: var(--radius);
+    background: var(--tile);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex; align-items: center;
+    padding: 0 24px;
+    cursor: pointer;
+    -webkit-transition: -webkit-transform 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
+    transition: transform 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
+  }
+  .tile:last-child { margin-right: 0; }
+
+  .icon {
+    position: relative;
+    width: 64px; height: 64px; flex-shrink: 0;
+    margin-right: 18px;
+    border-radius: 18px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px; font-weight: 600; color: #fff;
+    background: linear-gradient(145deg, var(--c), rgba(0,0,0,0.35));
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  }
+  .icon img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
+  .icon svg { width: 36px; height: 36px; }
+
+  .text { min-width: 0; }
+  .name { font-size: 25px; font-weight: 400; white-space: nowrap; }
+  .sub { margin-top: 6px; font-size: 16px; color: var(--muted); letter-spacing: 1px; }
+  .tile.input { width: 330px; }
+
+  #date, #wdesc, #wnote, .label, #temp, #hint { text-shadow: 0 2px 12px rgba(0,0,0,0.85); }
+  .tile.focus {
+    background: var(--tile-focus);
+    border-color: rgba(255, 255, 255, 0.3);
+    -webkit-transform: scale(1.08); transform: scale(1.08);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45), 0 0 0 2px rgba(255,255,255,0.4);
+  }
+  .tile.focus .name { font-weight: 500; }
+
+  #toast {
+    position: absolute; left: 50%; bottom: 60px; z-index: 5;
+    width: 900px; margin-left: -450px;
+    text-align: center; font-size: 24px;
+    padding: 20px 30px; border-radius: 22px;
+    background: rgba(20, 24, 36, 0.94);
+    border: 1px solid rgba(255,255,255,0.1);
+    opacity: 0; -webkit-transition: opacity 0.3s; transition: opacity 0.3s;
+  }
+  #toast.show { opacity: 1; }
+  #hint { position: absolute; right: 120px; bottom: 50px; font-size: 18px; color: rgba(244,246,251,0.32); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="bg-image"></div>
+  <div id="bg-shade"></div>
+  <div class="glow g1"></div>
+  <div class="glow g2"></div>
+  <div class="glow g3"></div>
+
+  <div class="content">
+    <header>
+      <div>
+        <div id="time">00:00</div>
+        <div id="date"></div>
+        <div id="fun"><div id="fun-emoji"></div><div><div id="fun-label"></div><div id="fun-text"></div></div></div>
+      </div>
+      <div id="weather">
+        <div class="now"><span id="wicon"></span><div id="temp">–°</div></div>
+        <div id="wdesc">Hämtar väder…</div>
+        <div id="forecast"></div>
+        <div id="wnote"></div>
+      </div>
+    </header>
+
+    <section id="apps-section">
+      <div class="label">Appar</div>
+      <div id="apps"></div>
+    </section>
+
+    <section id="inputs-section">
+      <div class="label">Ingångar</div>
+      <div id="inputs"></div>
+    </section>
+  </div>
+
+  <div id="toast"></div>
+  <div id="hint">Piltangenter för att flytta · OK för att öppna</div>
+</div>
+
+<script>
+// =================== INSTÄLLNINGAR – ändra här ===================
+
+// Bakgrundsbild: lägg en webbadress eller filnamn här, t.ex. "bakgrund.jpg". Tom = färgfläckar.
+var BACKGROUND = "bakgrund.jpg";
+
+// Var vädret gäller
+var WEATHER_PLACE = { name: "Stockholm", lat: 59.33, lon: 18.07 };
+
+// "match" = ord som används för att hitta appen (och dess ikon) bland apparna på TV:n.
+var APPS = [
+  { name: "Netflix",     color: "#e50914", match: ["netflix"] },
+  { name: "YouTube",     color: "#ff3d3d", match: ["youtube"] },
+  { name: "SVT Play",    color: "#1fae66", match: ["svt"] },
+  { name: "TV4 Play",    color: "#e8384a", match: ["tv4"] },
+  { name: "Viaplay",     color: "#b02bdb", match: ["viaplay"] },
+  { name: "HBO Max",     color: "#6a3df0", match: ["hbo", "max"] },
+  { name: "Disney+",     color: "#2f63e8", match: ["disney"] },
+  { name: "Prime Video", color: "#159fd0", match: ["prime video", "amazon"] },
+  { name: "SkyShowtime", color: "#7d5cf0", match: ["skyshowtime"] },
+  { name: "Crunchyroll", color: "#f07a22", match: ["crunchyroll"] },
+  { name: "Spotify",     color: "#18b552", match: ["spotify"] }
+];
+var INPUTS = [
+  { name: "Chromecast",    color: "#5a7bd8", hdmi: 1, icon: "cast" },
+  { name: "PlayStation 4", color: "#2e5fc4", hdmi: 2, icon: "pad" },
+  { name: "Game Console",  color: "#59657d", hdmi: 4, icon: "pad" }
+];
+var APPS_PER_ROW = 6;
+
+// =================== IKONER (enkla, egna) ===================
+var SVG = {
+  cal: '<svg viewBox="0 0 24 24" fill="none" stroke="#c9a2ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="3" fill="rgba(201,162,255,0.15)"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h2M12 14h2M8 17h2"/></svg>',
+  bulb: '<svg viewBox="0 0 24 24" fill="none" stroke="#ffd36b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z" fill="rgba(255,211,107,0.18)"/></svg>',
+  smile: '<svg viewBox="0 0 24 24" fill="none" stroke="#8fd3ff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9" fill="rgba(143,211,255,0.15)"/><path d="M8 14.5c1 1.4 2.4 2 4 2s3-.6 4-2"/><circle cx="9" cy="10" r=".9" fill="#8fd3ff"/><circle cx="15" cy="10" r=".9" fill="#8fd3ff"/></svg>',
+  cast: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M3 18a3 3 0 0 1 3 3M3 14a7 7 0 0 1 7 7M3 10a11 11 0 0 1 11 11"/><path d="M7 5h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-3"/></svg>',
+  pad: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10a5 5 0 0 1 4.6 7l-1 2.3a2.5 2.5 0 0 1-4.1.7L14.6 15H9.4L7.5 17a2.5 2.5 0 0 1-4.1-.7l-1-2.3A5 5 0 0 1 7 7z"/><path d="M8 10v3M6.5 11.5h3"/><circle cx="16" cy="10.5" r=".6" fill="#fff"/><circle cx="17.5" cy="12.5" r=".6" fill="#fff"/></svg>',
+  sun: '<svg viewBox="0 0 48 48" fill="none" stroke-linecap="round"><circle cx="24" cy="24" r="9" fill="#ffd36b"/><g stroke="#ffd36b" stroke-width="3"><path d="M24 5v5M24 38v5M5 24h5M38 24h5M10.6 10.6l3.5 3.5M33.9 33.9l3.5 3.5M10.6 37.4l3.5-3.5M33.9 14.1l3.5-3.5"/></g></svg>',
+  partly: '<svg viewBox="0 0 48 48" fill="none" stroke-linecap="round"><circle cx="18" cy="17" r="7" fill="#ffd36b"/><g stroke="#ffd36b" stroke-width="2.6"><path d="M18 4v3M5 17h3M8.8 7.8l2.1 2.1M27.2 7.8l-2.1 2.1"/></g><path d="M15 38h20a7 7 0 0 0 0-14 10 10 0 0 0-19 3 5.5 5.5 0 0 0-1 11z" fill="#e8edf7"/></svg>',
+  cloud: '<svg viewBox="0 0 48 48"><path d="M13 37h22a8 8 0 0 0 0-16 11 11 0 0 0-21 3.5A6.3 6.3 0 0 0 13 37z" fill="#dfe5f0"/></svg>',
+  rain: '<svg viewBox="0 0 48 48" fill="none" stroke-linecap="round"><path d="M13 30h22a8 8 0 0 0 0-16 11 11 0 0 0-21 3.5A6.3 6.3 0 0 0 13 30z" fill="#cfd7e6"/><g stroke="#6fb6ff" stroke-width="3"><path d="M17 35l-2 6M25 35l-2 6M33 35l-2 6"/></g></svg>',
+  snow: '<svg viewBox="0 0 48 48" fill="none" stroke-linecap="round"><path d="M13 30h22a8 8 0 0 0 0-16 11 11 0 0 0-21 3.5A6.3 6.3 0 0 0 13 30z" fill="#dfe5f0"/><g fill="#fff"><circle cx="17" cy="38" r="2.2"/><circle cx="25" cy="41" r="2.2"/><circle cx="33" cy="38" r="2.2"/></g></svg>',
+  storm: '<svg viewBox="0 0 48 48" fill="none"><path d="M13 30h22a8 8 0 0 0 0-16 11 11 0 0 0-21 3.5A6.3 6.3 0 0 0 13 30z" fill="#b9c2d4"/><path d="M25 31l-5 8h5l-3 7 8-10h-5l3-5z" fill="#ffd36b"/></svg>',
+  fog: '<svg viewBox="0 0 48 48" fill="none" stroke="#dfe5f0" stroke-width="3" stroke-linecap="round"><path d="M9 18h30M6 25h36M10 32h28M14 39h20"/></svg>'
+};
+
+// Vädervädret-koder (WMO) → ikon + svensk text
+function weatherInfo(code) {
+  if (code === 0) return ["sun", "Klart"];
+  if (code === 1) return ["partly", "Mest klart"];
+  if (code === 2) return ["partly", "Halvklart"];
+  if (code === 3) return ["cloud", "Mulet"];
+  if (code === 45 || code === 48) return ["fog", "Dimma"];
+  if (code >= 51 && code <= 57) return ["rain", "Duggregn"];
+  if (code >= 61 && code <= 67) return ["rain", "Regn"];
+  if (code >= 71 && code <= 77) return ["snow", "Snö"];
+  if (code >= 80 && code <= 82) return ["rain", "Regnskurar"];
+  if (code === 85 || code === 86) return ["snow", "Snöbyar"];
+  if (code >= 95) return ["storm", "Åska"];
+  return ["cloud", ""];
+}
+
+// =================== BYGG RUTORNA ===================
+var rows = [];
+
+function makeTile(item, isInput) {
+  var el = document.createElement("div");
+  el.className = "tile" + (isInput ? " input" : "");
+  el.style.setProperty("--c", item.color);
+  var iconInner = isInput ? SVG[item.icon] : item.name.charAt(0);
+  el.innerHTML = '<span class="icon">' + iconInner + '</span><span class="text"><div class="name"></div>' +
+    (isInput ? '<div class="sub">HDMI ' + item.hdmi + '</div>' : "") + '</span>';
+  el.querySelector(".name").textContent = item.name;
+  el._item = item;
+  el._isInput = isInput;
+  item._el = el;
+  el.addEventListener("mouseenter", function () { setFocus(el); });
+  el.addEventListener("click", function () { setFocus(el); activate(el); });
+  return el;
+}
+
+function buildRow(container, items, isInput) {
+  var rowEl = document.createElement("div");
+  rowEl.className = "row";
+  var tiles = [];
+  for (var i = 0; i < items.length; i++) {
+    var t = makeTile(items[i], isInput);
+    rowEl.appendChild(t);
+    tiles.push(t);
+  }
+  container.appendChild(rowEl);
+  rows.push(tiles);
+}
+
+var appsBox = document.getElementById("apps");
+for (var i = 0; i < APPS.length; i += APPS_PER_ROW) buildRow(appsBox, APPS.slice(i, i + APPS_PER_ROW), false);
+buildRow(document.getElementById("inputs"), INPUTS, true);
+
+// =================== FOKUS OCH FJÄRRKONTROLL ===================
+var cur = { r: 0, c: 0 };
+
+function setFocus(el) {
+  for (var r = 0; r < rows.length; r++)
+    for (var c = 0; c < rows[r].length; c++) {
+      if (rows[r][c] === el) cur = { r: r, c: c };
+      rows[r][c].classList.remove("focus");
+    }
+  el.classList.add("focus");
+}
+function centerX(el) { var b = el.getBoundingClientRect(); return b.left + b.width / 2; }
+function moveVertical(dir) {
+  var nr = cur.r + dir;
+  if (nr < 0 || nr >= rows.length) return;
+  var x = centerX(rows[cur.r][cur.c]), best = 0, bestD = 1e9;
+  for (var c = 0; c < rows[nr].length; c++) {
+    var d = Math.abs(centerX(rows[nr][c]) - x);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  setFocus(rows[nr][best]);
+}
+document.addEventListener("keydown", function (e) {
+  switch (e.keyCode) {
+    case 37: if (cur.c > 0) setFocus(rows[cur.r][cur.c - 1]); break;
+    case 39: if (cur.c < rows[cur.r].length - 1) setFocus(rows[cur.r][cur.c + 1]); break;
+    case 38: moveVertical(-1); break;
+    case 40: moveVertical(1); break;
+    case 13: activate(rows[cur.r][cur.c]); break;
+    default: return;
+  }
+  e.preventDefault();
+});
+
+// =================== APPAR PÅ TV:N (via bakgrundstjänsten service.js) ===================
+var SERVICE = "http://127.0.0.1:8085";
+var installed = null;   // [{id, name, icon}] när vi kör på TV:n
+var onTV = false;
+
+function findApp(item) {
+  if (!installed) return null;
+  for (var i = 0; i < installed.length; i++) {
+    var n = (installed[i].name || "").toLowerCase();
+    for (var j = 0; j < item.match.length; j++)
+      if (n.indexOf(item.match[j]) !== -1) return installed[i];
+  }
+  return null;
+}
+
+// Hämtar apparnas egna ikoner från TV:n. Funkar inte bilden behålls bokstaven.
+function useRealIcons() {
+  for (var i = 0; i < APPS.length; i++) {
+    var app = findApp(APPS[i]);
+    var box = APPS[i]._el.querySelector(".icon");
+    if (!app || !app.icon || box.querySelector("img")) continue;
+    var img = document.createElement("img");
+    img.onerror = function () { this.parentNode.removeChild(this); };
+    img.src = SERVICE + "/icon?p=" + encodeURIComponent(app.icon);
+    box.appendChild(img);
+  }
+}
+
+// Tjänsten startar samtidigt som sidan, så vi försöker några gånger
+function loadInstalledApps(tries) {
+  tries = tries || 0;
+  fetch(SERVICE + "/apps").then(function (r) { return r.json(); }).then(function (list) {
+    if (list.error) { toast("Kunde inte läsa apparna: " + list.error); return; }
+    onTV = true; installed = list; useRealIcons();
+  }).catch(function () {
+    if (tries < 10) setTimeout(function () { loadInstalledApps(tries + 1); }, 1500);
+  });
+}
+
+function callService(url, okMsg, failMsg) {
+  fetch(url).then(function (r) { return r.json(); }).then(function (res) {
+    if (res.error) toast(failMsg + ": " + res.error);
+    else if (okMsg) toast(okMsg);
+  }).catch(function () { toast(failMsg + " (tjänsten svarar inte)"); });
+}
+
+function activate(el) {
+  var item = el._item;
+  if (!onTV) {
+    toast(el._isInput ? "Förhandsvisning: på TV:n byts det till HDMI " + item.hdmi
+                      : "Förhandsvisning: på TV:n öppnas " + item.name + " här");
+    return;
+  }
+  if (el._isInput) {
+    callService(SERVICE + "/hdmi?n=" + item.hdmi, "Byter till " + item.name + "…", "Kunde inte byta ingång");
+    return;
+  }
+  var app = findApp(item);
+  if (!app) { toast("Hittade inte " + item.name + " bland apparna på TV:n"); return; }
+  callService(SERVICE + "/launch?id=" + encodeURIComponent(app.id), null, "Kunde inte öppna " + item.name);
+}
+
+// =================== VÄDER (Open-Meteo, gratis, ingen nyckel) ===================
+var DAYS = ["sön", "mån", "tis", "ons", "tor", "fre", "lör"];
+
+function showWeather(data, isExample) {
+  var now = weatherInfo(data.current.weather_code);
+  document.getElementById("wicon").innerHTML = SVG[now[0]];
+  document.getElementById("temp").textContent = Math.round(data.current.temperature_2m) + "°";
+  document.getElementById("wdesc").textContent = now[1] + " · " + WEATHER_PLACE.name;
+  var html = "";
+  for (var i = 1; i <= 3; i++) {
+    var d = new Date(data.daily.time[i] + "T12:00:00");
+    var w = weatherInfo(data.daily.weather_code[i]);
+    html += '<div class="day"><div class="dn">' + DAYS[d.getDay()] + '</div>' + SVG[w[0]] +
+      '<div class="dt">' + Math.round(data.daily.temperature_2m_max[i]) + '° <span>' +
+      Math.round(data.daily.temperature_2m_min[i]) + '°</span></div></div>';
+  }
+  document.getElementById("forecast").innerHTML = html;
+  document.getElementById("wnote").textContent = isExample ? "Exempeldata – riktigt väder visas på TV:n" : "";
+}
+
+function exampleWeather() {
+  var t = new Date(), days = [];
+  for (var i = 0; i < 4; i++) { var d = new Date(t.getTime() + i * 864e5); days.push(d.toISOString().slice(0, 10)); }
+  return { current: { temperature_2m: 6, weather_code: 2 },
+           daily: { time: days, weather_code: [2, 61, 3, 1], temperature_2m_max: [7, 6, 5, 4], temperature_2m_min: [3, 2, 1, -1] } };
+}
+
+function loadWeather() {
+  var url = "https://api.open-meteo.com/v1/forecast?latitude=" + WEATHER_PLACE.lat + "&longitude=" + WEATHER_PLACE.lon +
+    "&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min" +
+    "&timezone=Europe%2FStockholm&forecast_days=4";
+  fetch(url).then(function (r) { return r.json(); })
+    .then(function (data) { showWeather(data, false); })
+    .catch(function () { showWeather(exampleWeather(), true); });
+}
+
+// =================== KLOCKA ===================
+function pad(n) { return (n < 10 ? "0" : "") + n; }
+function tick() {
+  var d = new Date();
+  document.getElementById("time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes());
+  var h = d.getHours();
+  var hello = h < 5 ? "God natt" : h < 10 ? "God morgon" : h < 17 ? "Hej Gabriel" : h < 23 ? "God kväll" : "God natt";
+  document.getElementById("date").textContent =
+    d.toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" }) + "  ·  " + hello;
+}
+
+// =================== KUL FAKTA, SKÄMT & IDAG I HISTORIEN ===================
+// Lägg gärna till egna! Byts automatiskt var 20:e minut.
+// Var tredje gång visas "Idag i historien", som hämtas från svenska Wikipedia varje dag.
+var FUN_CHANGE_MINUTES = 20;
+var FACTS = [
+  "Bläckfiskar har tre hjärtan och blått blod.",
+  "Bananer räknas som bär – men jordgubbar gör det inte.",
+  "En dag på Venus är längre än ett helt år på Venus.",
+  "Wombater bajsar kubformat.",
+  "Sverige har fler öar än något annat land i världen – ungefär 267 000.",
+  "Eiffeltornet kan bli runt 15 cm högre på sommaren när järnet utvidgas av värmen.",
+  "Det finns fler träd på jorden än stjärnor i Vintergatan.",
+  "Hajar fanns på jorden innan det fanns träd.",
+  "Oxfords universitet är äldre än Aztekriket.",
+  "Flamingor är rosa för att maten de äter innehåller färgämnen.",
+  "En blixt är ungefär fem gånger varmare än solens yta.",
+  "Ett vanligt stackmoln kan väga flera hundra ton.",
+  "Kleopatra levde närmare i tid månlandningen än byggandet av Cheopspyramiden.",
+  "Havsuttrar håller varandra i tassarna när de sover så att de inte driver isär.",
+  "Spotify grundades i Stockholm 2006.",
+  "Programspråket Python är döpt efter komikergruppen Monty Python, inte efter ormen.",
+  "Den första 'datorbuggen' var en riktig mal som fastnat i en dator 1947.",
+  "Ett år på Neptunus är ungefär 165 jordår långt.",
+  "Getter har rektangulära pupiller.",
+  "Honung blir aldrig dålig – man har hittat ätbar honung i flera tusen år gamla egyptiska gravar.",
+  "Solljuset du ser just nu lämnade solen för ungefär åtta minuter sedan.",
+  "Koalor har fingeravtryck som är nästan omöjliga att skilja från människors.",
+  "Jordnötter är inte nötter – de är baljväxter, som ärtor och bönor.",
+  "Sniglar har tusentals små tänder.",
+  "En kolibris hjärta kan slå över 1 000 slag i minuten.",
+  "Vattenmeloner består till ungefär 92 procent av vatten.",
+  "I Norge finns en by som heter Hell.",
+  "Stockholms tunnelbana brukar kallas världens längsta konstutställning.",
+  "Ishotellet i Jukkasjärvi byggs upp på nytt varje vinter med is från Torne älv.",
+  "Katter kan inte känna sötsmak.",
+  "Ostron kan byta kön flera gånger under sitt liv.",
+  "Botaniskt sett är tomater frukter – närmare bestämt bär.",
+  "Lego tillverkar fler däck än någon bildäckstillverkare – små plastdäck förstås.",
+  "Hjärnan står för ungefär 20 procent av kroppens energiförbrukning.",
+  "Sveriges värmerekord är 38 grader – uppmätt i Ultuna 1933 och i Målilla 1947.",
+  "Ordet 'robot' kommer från tjeckiskans 'robota', som betyder tvångsarbete.",
+  "Det finns fler möjliga schackpartier än atomer i det observerbara universum.",
+  "Pingviner har knän – de är bara gömda under fjädrarna.",
+  "Ungefär 70 procent av jordens yta är täckt av vatten.",
+  "En blåvals hjärta är ungefär lika stort som en liten bil."
+];
+var JOKES = [
+  "Jag försökte lära mig Python, men allt kändes så… indraget.",
+  "Det finns 10 sorters människor: de som förstår binärt och de som inte gör det.",
+  "Vad sa nollan till åttan? – Snyggt bälte!",
+  "Varför är fiskar dåliga på tennis? De är rädda för nätet.",
+  "Vad heter en björn utan tänder? En gummibjörn.",
+  "Varför blev datorn förkyld? Den lämnade Windows öppet.",
+  "Vad sa den ena väggen till den andra? – Vi ses i hörnet!",
+  "Hur många programmerare krävs för att byta en glödlampa? Ingen – det är ett hårdvaruproblem.",
+  "Vad gör en snögubbe på sommaren? Smälter in.",
+  "Jag skulle dra ett skämt om UDP, men jag vet inte om du får det.",
+  "Min gamla TV och jag gick skilda vägar. Den var helt enkelt för smart för mig.",
+  "Varför tog tomaten aldrig steget ut? Den var lite för mosig.",
+  "Vad sa havet till stranden? Ingenting – det vinkade bara.",
+  "Varför har golfspelare alltid med sig två par byxor? Ifall de får hål i ett.",
+  "Vad är en vampyrs favoritfrukt? Blodapelsin.",
+  "Varför gick matteboken till psykologen? Den hade för många problem.",
+  "Hur vet man att en elefant har varit i kylskåpet? Fotspåren i smöret.",
+  "Varför blandar programmerare ihop Halloween och jul? För att OCT 31 = DEC 25.",
+  "Wi-Fi:t låg nere i fem minuter, så jag pratade med min familj. De verkar trevliga.",
+  "Varför är spöken så dåliga på att ljuga? Man ser rakt igenom dem.",
+  "Jag fick jobb på en kalenderfabrik, men fick sparken när jag tog ett par dagar ledigt.",
+  "Vad sa det ena örat till det andra? – Mellan oss finns det ett huvud.",
+  "– Doktorn, jag tror att jag är en kortlek! – Sätt dig, jag tar hand om dig senare.",
+  "Jag har ett skämt om byggarbete, men jag håller fortfarande på med det.",
+  "Varför sitter datorn alltid så nära skärmen? Den är närsynt."
+];
+
+// Ord som gör att en historiehändelse hoppas över (vi vill ha mysiga saker på hemskärmen)
+var HISTORY_SKIP = ["terror", "död", "dödade", "mord", "mörd", "krig", "attack", "olyck", "massaker",
+  "bomb", "skjut", "avrätt", "förlis", "omkom", "katastrof", "jordbävning", "kapning", "invasion", "slag vid", "slaget"];
+
+function storeGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+function storeSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+// Visar varje fakta/skämt en gång innan något upprepas – även om TV:n stängs av emellan
+function nextLocalItem() {
+  var all = [], i;
+  for (i = 0; i < FACTS.length; i++) all.push({ type: "fact", text: FACTS[i] });
+  for (i = 0; i < JOKES.length; i++) all.push({ type: "joke", text: JOKES[i] });
+  var seen = storeGet("funSeen") || [];
+  var unseen = [];
+  for (i = 0; i < all.length; i++) if (seen.indexOf(all[i].text) === -1) unseen.push(all[i]);
+  if (!unseen.length) { seen = []; unseen = all; }
+  var pick = unseen[Math.floor(Math.random() * unseen.length)];
+  seen.push(pick.text);
+  storeSet("funSeen", seen);
+  return pick;
+}
+
+// Idag i historien (svenska Wikipedia)
+var histFeed = { day: "", items: [], pos: 0 };
+
+function loadHistory() {
+  var d = new Date();
+  var key = (d.getMonth() + 1) + "-" + d.getDate();
+  if (histFeed.day === key) return;
+  var url = "https://sv.wikipedia.org/api/rest_v1/feed/onthisday/events/" + pad(d.getMonth() + 1) + "/" + pad(d.getDate());
+  fetch(url).then(function (r) { return r.json(); }).then(function (data) {
+    var out = [];
+    (data.events || []).forEach(function (e) {
+      var t = (e.text || "").replace(/\s+/g, " ").trim();
+      var low = t.toLowerCase(), bad = false;
+      for (var i = 0; i < HISTORY_SKIP.length; i++) if (low.indexOf(HISTORY_SKIP[i]) !== -1) bad = true;
+      if (bad || t.length < 20) return;
+      if (t.length > 170) t = t.slice(0, 167).replace(/\s+\S*$/, "") + "…";
+      out.push({ type: "history", text: "År " + e.year + ": " + t });
+    });
+    histFeed = { day: key, items: out, pos: 0 };
+  }).catch(function () {});
+}
+
+var funCount = 0;
+function nextFunItem() {
+  funCount++;
+  if (funCount % 3 === 0 && histFeed.pos < histFeed.items.length) return histFeed.items[histFeed.pos++];
+  return nextLocalItem();
+}
+
+var LABELS = { fact: "Visste du?", joke: "Dagens skämt", history: "Idag i historien" };
+
+function showFun() {
+  loadHistory();
+  var box = document.getElementById("fun");
+  box.classList.add("hide");
+  setTimeout(function () {
+    var it = nextFunItem();
+    document.getElementById("fun-emoji").innerHTML = it.type === "fact" ? SVG.bulb : it.type === "joke" ? SVG.smile : SVG.cal;
+    document.getElementById("fun-label").textContent = LABELS[it.type];
+    document.getElementById("fun-text").textContent = it.text;
+    box.classList.remove("hide");
+  }, 800);
+}
+
+// =================== ÖVRIGT ===================
+var toastTimer;
+function toast(msg) {
+  var t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.remove("show"); }, 3200);
+}
+function fit() {
+  var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+  var st = document.getElementById("stage");
+  st.style.webkitTransform = "scale(" + s + ")";
+  st.style.transform = "scale(" + s + ")";
+}
+function applyBackground() {
+  if (!BACKGROUND) return;
+  document.getElementById("bg-image").style.backgroundImage = 'url("' + BACKGROUND + '")';
+  document.getElementById("stage").className = "has-image";
+}
+
+window.addEventListener("resize", fit);
+fit();
+applyBackground();
+tick(); setInterval(tick, 1000);
+loadWeather(); setInterval(loadWeather, 15 * 60 * 1000);
+showFun(); setInterval(showFun, FUN_CHANGE_MINUTES * 60 * 1000);
+loadInstalledApps();
+setFocus(rows[0][0]);
+</script>
+</body>
+</html>
