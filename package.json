@@ -1,0 +1,13 @@
+{
+  "name": "tv-hem",
+  "version": "1.3.0",
+  "description": "Gabriels egen hemskärm för Samsung-TV via TizenBrew",
+  "appName": "Hem",
+  "packageType": "app",
+  "appPath": "index.html",
+  "keywords": [
+    "tizenbrew"
+  ],
+  "license": "MIT",
+  "serviceFile": "service.js"
+}
